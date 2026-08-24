@@ -512,6 +512,91 @@ function SeriesDetail({ comics, onOpen }: { comics: Comic[]; onOpen: (comic: Com
   );
 }
 
+/**
+ * Export and import of the library file.
+ *
+ * Reading progress is keyed to a comic's path and size, so moving a collection
+ * to another drive would otherwise strand every position, rating, and favourite.
+ * An export carries that history and the import re-attaches it by filename, so
+ * reorganising files costs nothing.
+ */
+function BackupSection({ library }: { library: ReturnType<typeof useLibrary> }) {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string }>();
+
+  const doExport = useCallback(async () => {
+    setBusy(true);
+    setMessage(undefined);
+    try {
+      const result = await window.longbox.exportLibrary();
+      if (result.cancelled) return;
+      if (!result.ok) {
+        setMessage({ kind: 'error', text: result.error });
+        return;
+      }
+      setMessage({
+        kind: 'ok',
+        text: `Saved ${result.comics} ${result.comics === 1 ? 'comic' : 'comics'} to ${result.path}`,
+      });
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  const doImport = useCallback(async () => {
+    setBusy(true);
+    setMessage(undefined);
+    try {
+      const result = await window.longbox.importLibrary();
+      if (result.cancelled) return;
+      if (!result.ok) {
+        setMessage({ kind: 'error', text: result.error });
+        return;
+      }
+
+      const { summary } = result;
+      const parts = [
+        `${summary.progressUpdated} of ${summary.matched} matched ${summary.matched === 1 ? 'comic' : 'comics'} updated`,
+      ];
+      // Worth surfacing: a name match means the files moved since the export.
+      const byName = summary.matchedByNameAndSize + summary.matchedByName;
+      if (byName > 0) parts.push(`${byName} re-matched by filename after a move`);
+      if (summary.unmatched > 0) parts.push(`${summary.unmatched} not in this library yet`);
+      if (summary.foldersAdded > 0) parts.push(`${summary.foldersAdded} folder(s) added`);
+      if (summary.collectionsAdded > 0) parts.push(`${summary.collectionsAdded} collection(s) added`);
+
+      setMessage({ kind: 'ok', text: parts.join(' · ') });
+      await library.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }, [library]);
+
+  return (
+    <section>
+      <h2>Backup</h2>
+      <p className="hint">
+        An export holds reading progress, ratings, favourites, tags, and collections — not the
+        comics themselves. Importing only ever moves progress forward, so it is safe to run
+        against a library you have kept reading.
+      </p>
+
+      <div className="folder-row">
+        <button className="btn primary" onClick={() => void doExport()} disabled={busy}>
+          Export library…
+        </button>
+        <button className="btn" onClick={() => void doImport()} disabled={busy}>
+          Import library…
+        </button>
+      </div>
+
+      {message && (
+        <p className={message.kind === 'error' ? 'hint error' : 'hint'}>{message.text}</p>
+      )}
+    </section>
+  );
+}
+
 function Settings({ library }: { library: ReturnType<typeof useLibrary> }) {
   return (
     <div className="panel">
@@ -582,6 +667,8 @@ function Settings({ library }: { library: ReturnType<typeof useLibrary> }) {
           </select>
         </div>
       </section>
+
+      <BackupSection library={library} />
 
       <section>
         <h2>Keyboard</h2>

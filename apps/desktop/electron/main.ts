@@ -2,8 +2,8 @@ import { app, BrowserWindow, dialog, ipcMain, protocol, shell } from 'electron';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { Library, hash64 } from '@longbox/core';
-import type { Comic, LibraryPersistence, LibrarySnapshot } from '@longbox/core';
+import { Library, buildExport, hash64, mergeImport, parseExport } from '@longbox/core';
+import type { Comic, ImportOptions, LibraryPersistence, LibrarySnapshot } from '@longbox/core';
 import { getArchive, closeAll, invalidate } from './archiveCache.ts';
 import { scanFolders } from './scanner.ts';
 
@@ -296,6 +296,73 @@ function registerIpc(): void {
   });
 
   ipcMain.handle('settings:update', (_event, patch) => library.updateSettings(patch));
+
+  // --- Backup -------------------------------------------------------------
+
+  /**
+   * Write the library to a file the user chooses.
+   *
+   * Pretty-printed rather than minified: an export is something people keep,
+   * move between machines, and occasionally need to look inside when something
+   * has gone wrong. The extra bytes are worth being able to read it.
+   */
+  ipcMain.handle('library:export', async () => {
+    if (!mainWindow) return { ok: false as const, cancelled: true as const };
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Export library',
+      defaultPath: join(app.getPath('documents'), `longbox-library-${stamp}.json`),
+      filters: [{ name: 'Longbox library', extensions: ['json'] }],
+    });
+    if (result.canceled || !result.filePath) return { ok: false as const, cancelled: true as const };
+
+    const payload = buildExport(library.toJSON(), app.getVersion());
+    await writeFile(result.filePath, JSON.stringify(payload, undefined, 2), 'utf8');
+    return {
+      ok: true as const,
+      cancelled: false as const,
+      path: result.filePath,
+      comics: payload.snapshot.comics.length,
+    };
+  });
+
+  /**
+   * Merge an export into the current library.
+   *
+   * The library is flushed to disk before anything changes, so the file on disk
+   * is a known-good state if the merge turns out to be unwanted.
+   */
+  ipcMain.handle('library:import', async (_event, options: ImportOptions = {}) => {
+    if (!mainWindow) return { ok: false as const, cancelled: true as const };
+
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Import library',
+      properties: ['openFile'],
+      filters: [{ name: 'Longbox library', extensions: ['json'] }],
+    });
+    if (result.canceled || !result.filePaths[0]) {
+      return { ok: false as const, cancelled: true as const };
+    }
+
+    try {
+      const text = await readFile(result.filePaths[0], 'utf8');
+      const incoming = parseExport(text);
+      await library.flush();
+
+      const { snapshot, summary } = mergeImport(library.toJSON(), incoming, options);
+      library.replaceSnapshot(snapshot);
+      await library.flush();
+
+      return { ok: true as const, cancelled: false as const, summary };
+    } catch (error) {
+      return {
+        ok: false as const,
+        cancelled: false as const,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
 
   /**
    * The renderer downscales a cover with canvas and sends the JPEG back, since

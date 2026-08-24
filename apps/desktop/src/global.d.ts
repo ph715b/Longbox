@@ -1,6 +1,8 @@
 import type {
   Collection,
   Comic,
+  ImportOptions,
+  ImportSummary,
   LibraryFolder,
   LibrarySettings,
   ReadingStats,
@@ -29,6 +31,16 @@ export interface ScanSummary {
   cancelled: boolean;
 }
 
+export type ExportResult =
+  | { ok: true; cancelled: false; path: string; comics: number }
+  | { ok: false; cancelled: true }
+  | { ok: false; cancelled: false; error: string };
+
+export type ImportResult =
+  | { ok: true; cancelled: false; summary: ImportSummary }
+  | { ok: false; cancelled: true }
+  | { ok: false; cancelled: false; error: string };
+
 export interface LongboxApi {
   getSnapshot(): Promise<LibrarySnapshotView>;
   getStats(): Promise<ReadingStats>;
@@ -49,6 +61,9 @@ export interface LongboxApi {
 
   setSeriesPreferences(seriesId: string, preferences: SeriesPreferences): Promise<Series[]>;
   updateSettings(patch: Partial<LibrarySettings>): Promise<LibrarySettings>;
+
+  exportLibrary(): Promise<ExportResult>;
+  importLibrary(options?: ImportOptions): Promise<ImportResult>;
 
   saveThumbnail(id: string, data: Uint8Array): Promise<void>;
 

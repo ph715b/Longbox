@@ -654,6 +654,11 @@ select.btn {
   font-size: 12.5px;
 }
 
+/* Import failures report a reason; make it read as one. */
+.panel .hint.error {
+  color: var(--danger);
+}
+
 .folder-row {
   display: flex;
   align-items: center;

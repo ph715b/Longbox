@@ -66,4 +66,13 @@ export type {
   LibrarySettings,
 } from './library/store.ts';
 
+export {
+  buildExport,
+  parseExport,
+  mergeImport,
+  EXPORT_FORMAT,
+  EXPORT_VERSION,
+} from './library/transfer.ts';
+export type { LibraryExport, ImportOptions, ImportSummary } from './library/transfer.ts';
+
 export { hash64, comicId, seriesId, normaliseSeriesName } from './util/id.ts';

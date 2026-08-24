@@ -42,6 +42,10 @@ const api = {
     ipcRenderer.invoke('series:preferences', seriesId, preferences),
   updateSettings: (patch: unknown) => ipcRenderer.invoke('settings:update', patch),
 
+  // --- Backup -------------------------------------------------------------
+  exportLibrary: () => ipcRenderer.invoke('library:export'),
+  importLibrary: (options?: unknown) => ipcRenderer.invoke('library:import', options),
+
   // --- Thumbnails ---------------------------------------------------------
   saveThumbnail: (id: string, data: Uint8Array) =>
     ipcRenderer.invoke('thumb:save', id, data),

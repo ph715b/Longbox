@@ -355,6 +355,16 @@ export class Library {
     await this.persistence.save(this.snapshot);
   }
 
+  /**
+   * Replace the whole library with a merged snapshot, as an import does.
+   * Kept on the class so the cached series list is invalidated and the write is
+   * scheduled the same way every other mutation does it.
+   */
+  replaceSnapshot(next: LibrarySnapshot): void {
+    this.snapshot = next;
+    this.invalidate();
+  }
+
   /** The raw snapshot, for backup/export. */
   toJSON(): LibrarySnapshot {
     return this.snapshot;
