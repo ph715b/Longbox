@@ -1,0 +1,32 @@
+{
+  "name": "@longbox/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "productName": "Longbox",
+  "description": "Longbox desktop app for Windows",
+  "author": "Longbox",
+  "main": "./out/main/main.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "dist": "electron-vite build && electron-builder --win",
+    "dist:dir": "electron-vite build && electron-builder --win --dir"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^4.5.0",
+    "fflate": "^0.8.2",
+    "node-unrar-js": "^2.0.2"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "electron": "^43.4.1",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "vite": "^7.1.0"
+  }
+}

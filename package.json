@@ -1,0 +1,24 @@
+{
+  "name": "longbox",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Offline comic library and reader for Windows and Android",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=@longbox/desktop",
+    "build": "npm run build --workspace=@longbox/desktop",
+    "dist": "npm run dist --workspace=@longbox/desktop",
+    "test": "node --experimental-strip-types --test \"packages/core/src/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

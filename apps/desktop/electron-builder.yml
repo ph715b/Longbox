@@ -1,0 +1,38 @@
+appId: com.longbox.desktop
+productName: Longbox
+
+# electron is hoisted to the workspace root, so electron-builder cannot find it
+# in apps/desktop/node_modules to resolve the "^43.4.1" range itself. Keep this
+# in step with the devDependency.
+electronVersion: 43.4.1
+
+directories:
+  output: ../../release
+  buildResources: build
+
+# Only the compiled bundles ship. `electron/` and `src/` are inputs to the
+# build, not part of it, and shipping them would just bloat the installer.
+files:
+  - out/**
+  - package.json
+
+# node-unrar-js is an Emscripten build that locates `unrar.wasm` relative to
+# __dirname and reads it off disk. Leaving it inside the asar has caught people
+# out before, so unpack it and let it find a real file.
+asarUnpack:
+  - '**/node_modules/node-unrar-js/**'
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+
+nsis:
+  # A per-user install needs no elevation prompt, and Longbox has no reason to
+  # write outside the user's profile.
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Longbox
