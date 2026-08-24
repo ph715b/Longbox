@@ -30,6 +30,28 @@ export function hash64(input: string | Uint8Array): string {
 }
 
 /**
+ * How much of a cover to hash. FNV-1a here runs on BigInt, so a full 2MB page
+ * would cost millions of BigInt multiplications; a duplicate check over a whole
+ * library would take minutes. The leading bytes of an encoded image carry the
+ * header and the start of the entropy-coded data, which differs immediately
+ * between two different pictures, so a sample discriminates as well as the
+ * whole thing for this purpose.
+ */
+const COVER_SAMPLE_BYTES = 64 * 1024;
+
+/**
+ * Fingerprint a cover image so the same scan can be recognised inside two
+ * different archives.
+ *
+ * The length is mixed in as well as the bytes, so two images sharing a header
+ * but differing later still separate.
+ */
+export function coverHash(bytes: Uint8Array): string {
+  const sample = bytes.length > COVER_SAMPLE_BYTES ? bytes.subarray(0, COVER_SAMPLE_BYTES) : bytes;
+  return hash64(`${bytes.length}:${hash64(sample)}`);
+}
+
+/**
  * Identity for a comic file. Path and size together are specific enough to
  * distinguish files while staying stable across metadata edits.
  *

@@ -2,8 +2,23 @@ import { app, BrowserWindow, dialog, ipcMain, protocol, shell } from 'electron';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { Library, buildExport, hash64, mergeImport, parseExport } from '@longbox/core';
-import type { Comic, ImportOptions, LibraryPersistence, LibrarySnapshot } from '@longbox/core';
+import {
+  Library,
+  buildExport,
+  coverHash,
+  duplicateWaste,
+  findDuplicates,
+  hash64,
+  mergeImport,
+  parseExport,
+} from '@longbox/core';
+import type {
+  Collection,
+  Comic,
+  ImportOptions,
+  LibraryPersistence,
+  LibrarySnapshot,
+} from '@longbox/core';
 import { getArchive, closeAll, invalidate } from './archiveCache.ts';
 import { scanFolders } from './scanner.ts';
 
@@ -296,6 +311,87 @@ function registerIpc(): void {
   });
 
   ipcMain.handle('settings:update', (_event, patch) => library.updateSettings(patch));
+
+  // --- Collections --------------------------------------------------------
+
+  ipcMain.handle('collection:save', (_event, collection: Collection) => {
+    library.upsertCollection(collection);
+    return library.collections;
+  });
+
+  ipcMain.handle('collection:remove', (_event, id: string) => {
+    library.removeCollection(id);
+    return library.collections;
+  });
+
+  /**
+   * Add or remove comics in one call rather than replacing the whole id list,
+   * so two windows editing the same collection cannot clobber each other's
+   * changes with a stale copy.
+   */
+  ipcMain.handle(
+    'collection:setMembers',
+    (_event, id: string, comicIds: string[], member: boolean) => {
+      const collection = library.collections.find((entry) => entry.id === id);
+      if (!collection) return library.collections;
+
+      const wanted = new Set(comicIds);
+      const next = member
+        ? [...collection.comicIds, ...comicIds.filter((cid) => !collection.comicIds.includes(cid))]
+        : collection.comicIds.filter((cid) => !wanted.has(cid));
+
+      library.upsertCollection({ ...collection, comicIds: next });
+      return library.collections;
+    },
+  );
+
+  // --- Duplicates ---------------------------------------------------------
+
+  ipcMain.handle('library:duplicates', () => {
+    const groups = findDuplicates(library.comics);
+    return { groups, wastedBytes: duplicateWaste(groups, library.comics) };
+  });
+
+  /**
+   * Fingerprint first pages so duplicates can be matched on cover rather than
+   * on size or filename.
+   *
+   * This is deliberately not part of a scan. It opens and decodes the first
+   * page of every archive, which is far more work than indexing needs, so it
+   * stays an explicit action with a progress report behind it.
+   */
+  ipcMain.handle('library:hashCovers', async () => {
+    scanCancelled = false;
+    const pending = library.comics.filter((comic) => !comic.coverHash && !comic.missing);
+    let done = 0;
+    let failed = 0;
+
+    for (const comic of pending) {
+      if (scanCancelled) break;
+      try {
+        const archive = await getArchive(comic.path);
+        if (archive.pageEntries.length > 0) {
+          library.updateComic(comic.id, { coverHash: coverHash(await archive.readPage(0)) });
+        }
+        done += 1;
+      } catch {
+        // A file that will not open is a problem for the reader to report, not
+        // something that should abort fingerprinting the rest of the library.
+        failed += 1;
+      }
+
+      mainWindow?.webContents.send('scan:progress', {
+        phase: 'thumbnailing',
+        filesFound: pending.length,
+        filesProcessed: done + failed,
+        current: comic.filename,
+        errors: [],
+      });
+    }
+
+    await library.flush();
+    return { hashed: done, failed, cancelled: scanCancelled };
+  });
 
   // --- Backup -------------------------------------------------------------
 

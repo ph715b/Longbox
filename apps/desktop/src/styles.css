@@ -25,6 +25,19 @@
   --danger: #e05252;
   --success: #4ec97a;
 
+  /*
+   * Sequential ramp for the reading calendar. One hue, monotone lightness, with
+   * the dimmest step still clearing 2:1 against --bg-raised so a quiet day is
+   * visible without competing with a busy one. Checked against the surface
+   * rather than picked by eye.
+   */
+  --heat-0: #191c28;
+  --heat-1: #664917;
+  --heat-2: #8f631a;
+  --heat-3: #b8801c;
+  --heat-4: #dd971f;
+  --heat-5: #ffb340;
+
   --radius: 8px;
   --radius-sm: 5px;
 
@@ -689,4 +702,411 @@ select.btn {
 .field label {
   flex: 0 0 190px;
   color: var(--text-muted);
+}
+
+/* --- Stats ------------------------------------------------------------- */
+
+.stats {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.stats section {
+  margin-bottom: 0;
+}
+
+/* Settings reads better narrow; these screens carry tables and charts. */
+.panel.wide {
+  max-width: 1000px;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.tile {
+  padding: 16px 18px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+/*
+ * The figure is the point of the tile, so it is large and set in the app's own
+ * face. Proportional digits, not tabular: equal-width figures make a standalone
+ * number look gappy, and nothing here has to align in a column.
+ */
+.tile-figure {
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.tile-label {
+  margin-top: 5px;
+  color: var(--text-muted);
+}
+
+.tile-note {
+  margin-top: 2px;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.chart {
+  padding: 18px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.chart h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.chart-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chart-sub {
+  margin: 3px 0 14px;
+  color: var(--text-faint);
+  font-size: 12.5px;
+}
+
+/* --- Reading calendar --------------------------------------------------- */
+
+.calendar-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.calendar-grid {
+  display: flex;
+  gap: 3px;
+}
+
+.calendar-week {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/*
+ * Cells are separated by surface gaps rather than borders: a stroke around every
+ * cell would lay a grid of lines over the data louder than the data itself.
+ */
+.calendar-day {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--heat-0);
+}
+
+.calendar-day[data-level="1"] { background: var(--heat-1); }
+.calendar-day[data-level="2"] { background: var(--heat-2); }
+.calendar-day[data-level="3"] { background: var(--heat-3); }
+.calendar-day[data-level="4"] { background: var(--heat-4); }
+.calendar-day[data-level="5"] { background: var(--heat-5); }
+
+/* Labels are positioned rather than laid out: each is wider than the column it
+   marks, so they have to be free to overhang without displacing each other. */
+.calendar-months {
+  position: relative;
+  height: 15px;
+  margin-bottom: 5px;
+}
+
+.calendar-month {
+  position: absolute;
+  top: 0;
+  color: var(--text-faint);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.calendar-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 12px;
+  color: var(--text-faint);
+  font-size: 11.5px;
+}
+
+/* --- Ranked bars -------------------------------------------------------- */
+
+.bars {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: minmax(90px, 190px) 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.bar-label {
+  overflow: hidden;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The track is the recessive part; the fill carries the value. */
+.bar-track {
+  height: 10px;
+  background: var(--bg-sunken);
+  border-radius: 5px;
+}
+
+/*
+ * One hue for every bar. These are names, not magnitudes: length already says
+ * how much, and colouring each bar differently would spend the identity channel
+ * saying the same thing twice.
+ */
+.bar-fill {
+  height: 100%;
+  min-width: 4px;
+  background: var(--accent);
+  border-radius: 0 4px 4px 0;
+}
+
+.bar-value {
+  min-width: 44px;
+  color: var(--text);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* --- Data table: the calendar read without relying on colour ------------ */
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.data-table th {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-faint);
+  font-weight: 500;
+  text-align: left;
+}
+
+.data-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.data-table .num {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* --- Collections -------------------------------------------------------- */
+
+.collection-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.collection-head h2 {
+  margin: 0;
+}
+
+.link-cell {
+  flex: 1;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.link-cell:hover {
+  color: var(--accent);
+}
+
+.input {
+  padding: 7px 10px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+}
+
+.input:focus {
+  border-color: var(--border-strong);
+  outline: none;
+}
+
+.btn.small {
+  padding: 4px 9px;
+  font-size: 12px;
+}
+
+/* The add-to-collection control, sitting over a cover. */
+.card-menu-anchor {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+}
+
+.card-add {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: rgb(0 0 0 / 62%);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  opacity: 0;
+  place-items: center;
+  transition: opacity 90ms ease;
+}
+
+.card:hover .card-add,
+.card:focus-within .card-add {
+  opacity: 1;
+}
+
+.card-menu {
+  position: absolute;
+  top: 28px;
+  left: 0;
+  z-index: 5;
+  min-width: 168px;
+  padding: 4px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+}
+
+.card-menu-item {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12.5px;
+  text-align: left;
+}
+
+.card-menu-item:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.card-menu-item.on {
+  color: var(--text);
+}
+
+.card-menu-item .tick {
+  width: 12px;
+  color: var(--accent);
+}
+
+.card-menu-empty {
+  margin: 0;
+  padding: 6px 8px;
+  color: var(--text-faint);
+  font-size: 12.5px;
+}
+
+/* --- Duplicates --------------------------------------------------------- */
+
+.dupe-group {
+  margin-bottom: 14px;
+  padding: 12px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.dupe-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.badge.reason {
+  position: static;
+  background: var(--bg-hover);
+  color: var(--text-muted);
+}
+
+.dupe-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px;
+  border-radius: var(--radius-sm);
+}
+
+.dupe-row.keep {
+  background: var(--bg-sunken);
+}
+
+.dupe-mark {
+  width: 34px;
+  color: var(--success);
+  font-size: 11.5px;
+}
+
+.dupe-detail {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dupe-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dupe-path {
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dupe-facts {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }

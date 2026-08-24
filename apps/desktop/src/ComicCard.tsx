@@ -1,6 +1,6 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatComicTitle } from '@longbox/core';
-import type { Comic } from '@longbox/core';
+import type { Collection, Comic } from '@longbox/core';
 
 /** Width of generated cover thumbnails, in CSS pixels before DPI scaling. */
 const THUMB_WIDTH = 340;
@@ -49,11 +49,50 @@ interface ComicCardProps {
   /** Overrides the derived title, used when showing a series rather than an issue. */
   title?: string;
   subtitle?: string;
+  /** When given, the cover carries a control for adding to these collections. */
+  collections?: Collection[];
+  onCollectionsChanged?: () => void;
 }
 
-export function ComicCard({ comic, onOpen, title, subtitle }: ComicCardProps) {
+export function ComicCard({
+  comic,
+  onOpen,
+  title,
+  subtitle,
+  collections,
+  onCollectionsChanged,
+}: ComicCardProps) {
   const [failed, setFailed] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // A click anywhere else closes the menu. Registered only while it is open so
+  // a grid of several hundred cards is not all listening at once.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDocumentClick = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onDocumentClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocumentClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
+
+  const toggleMembership = useCallback(
+    async (collection: Collection) => {
+      const member = collection.comicIds.includes(comic.id);
+      await window.longbox.setCollectionMembers(collection.id, [comic.id], !member);
+      onCollectionsChanged?.();
+    },
+    [comic.id, onCollectionsChanged],
+  );
 
   const handleLoad = useCallback(() => {
     const image = imageRef.current;
@@ -74,7 +113,21 @@ export function ComicCard({ comic, onOpen, title, subtitle }: ComicCardProps) {
       .join(' · ');
 
   return (
-    <button className="card" onClick={() => onOpen(comic)} title={comic.filename}>
+    // A div rather than a button: the collections control is itself a button and
+    // one cannot be nested inside another.
+    <div
+      className="card"
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(comic)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onOpen(comic);
+        }
+      }}
+      title={comic.filename}
+    >
       <div className="cover">
         {failed ? (
           <div className="cover-fallback">{comic.filename}</div>
@@ -101,10 +154,48 @@ export function ComicCard({ comic, onOpen, title, subtitle }: ComicCardProps) {
             <span style={{ width: `${percent}%` }} />
           </div>
         )}
+
+        {collections && (
+          <div className="card-menu-anchor" ref={menuRef}>
+            <button
+              className="card-add"
+              title="Add to a collection"
+              aria-label="Add to a collection"
+              onClick={(event) => {
+                event.stopPropagation();
+                setMenuOpen((open) => !open);
+              }}
+            >
+              +
+            </button>
+
+            {menuOpen && (
+              <div className="card-menu" onClick={(event) => event.stopPropagation()}>
+                {collections.length === 0 ? (
+                  <p className="card-menu-empty">No collections yet.</p>
+                ) : (
+                  collections.map((collection) => {
+                    const member = collection.comicIds.includes(comic.id);
+                    return (
+                      <button
+                        key={collection.id}
+                        className={`card-menu-item ${member ? 'on' : ''}`}
+                        onClick={() => void toggleMembership(collection)}
+                      >
+                        <span className="tick">{member ? '✓' : ''}</span>
+                        {collection.name}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="card-title">{heading}</div>
       {sub && <div className="card-sub">{sub}</div>}
-    </button>
+    </div>
   );
 }

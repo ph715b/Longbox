@@ -17,6 +17,15 @@ it unchanged. The desktop app consumes it as TypeScript source rather than as a
 built package, so there is no build step to run first and no stale `dist` to
 drift out of sync.
 
+## What it does
+
+    Library        watched folders, scanned and grouped into series
+    Reader         single page, two-page spreads, or continuous scroll
+    Collections    hand-ordered lists -- a queue, a re-read, a pile to get to
+    Stats          pages read per day, time spent, most-read series
+    Duplicates     candidate copies of the same book, matched three ways
+    Backup         export and import the library, including reading progress
+
 ## Supported files
 
 `.cbz` / `.zip`, `.cbr` / `.rar`, and `.cbt` / `.tar`. Archives are sniffed by

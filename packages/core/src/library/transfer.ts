@@ -59,6 +59,8 @@ export interface ImportSummary {
   collectionsAdded: number;
   collectionsMerged: number;
   seriesPreferencesAdded: number;
+  /** Days of reading history brought across from the export's activity log. */
+  activityDaysMerged: number;
   settingsApplied: boolean;
 }
 
@@ -154,6 +156,7 @@ export function mergeImport(
     collectionsAdded: 0,
     collectionsMerged: 0,
     seriesPreferencesAdded: 0,
+    activityDaysMerged: 0,
     settingsApplied: false,
   };
 
@@ -239,6 +242,16 @@ export function mergeImport(
     if (snapshot.seriesPreferences[seriesId]) continue;
     snapshot.seriesPreferences = { ...snapshot.seriesPreferences, [seriesId]: preferences };
     summary.seriesPreferencesAdded += 1;
+  }
+
+  // The reading log is keyed by calendar day and merged by taking the larger
+  // count, not the sum: the same day is usually present on both sides, and
+  // adding them would double every page on a second import of the same file.
+  for (const [day, pages] of Object.entries(incoming.snapshot.activity ?? {})) {
+    const current = snapshot.activity[day] ?? 0;
+    if (pages <= current) continue;
+    snapshot.activity = { ...snapshot.activity, [day]: pages };
+    summary.activityDaysMerged += 1;
   }
 
   if (options.includeSettings && incoming.snapshot.settings) {

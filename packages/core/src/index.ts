@@ -75,4 +75,7 @@ export {
 } from './library/transfer.ts';
 export type { LibraryExport, ImportOptions, ImportSummary } from './library/transfer.ts';
 
-export { hash64, comicId, seriesId, normaliseSeriesName } from './util/id.ts';
+export { findDuplicates, duplicateWaste } from './library/duplicates.ts';
+export type { DuplicateOptions } from './library/duplicates.ts';
+
+export { hash64, coverHash, comicId, seriesId, normaliseSeriesName } from './util/id.ts';

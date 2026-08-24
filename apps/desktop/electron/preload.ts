@@ -42,6 +42,16 @@ const api = {
     ipcRenderer.invoke('series:preferences', seriesId, preferences),
   updateSettings: (patch: unknown) => ipcRenderer.invoke('settings:update', patch),
 
+  // --- Collections --------------------------------------------------------
+  saveCollection: (collection: unknown) => ipcRenderer.invoke('collection:save', collection),
+  removeCollection: (id: string) => ipcRenderer.invoke('collection:remove', id),
+  setCollectionMembers: (id: string, comicIds: string[], member: boolean) =>
+    ipcRenderer.invoke('collection:setMembers', id, comicIds, member),
+
+  // --- Duplicates ---------------------------------------------------------
+  findDuplicates: () => ipcRenderer.invoke('library:duplicates'),
+  hashCovers: () => ipcRenderer.invoke('library:hashCovers'),
+
   // --- Backup -------------------------------------------------------------
   exportLibrary: () => ipcRenderer.invoke('library:export'),
   importLibrary: (options?: unknown) => ipcRenderer.invoke('library:import', options),

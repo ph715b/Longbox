@@ -58,6 +58,15 @@ export interface LibrarySnapshot {
   folders: LibraryFolder[];
   /** Per-series overrides, keyed by series id. Series themselves are derived. */
   seriesPreferences: Record<string, SeriesPreferences>;
+  /**
+   * Pages actually turned, per calendar day, keyed YYYY-MM-DD.
+   *
+   * Recorded as it happens because it cannot be reconstructed afterwards: a
+   * comic stores only where the reader got to and when they last touched it,
+   * which says nothing about which days the pages were read on. Added in a
+   * library that has none simply starts empty.
+   */
+  activity: Record<string, number>;
   settings: LibrarySettings;
 }
 
@@ -68,6 +77,7 @@ export function emptySnapshot(): LibrarySnapshot {
     collections: [],
     folders: [],
     seriesPreferences: {},
+    activity: {},
     settings: { ...DEFAULT_SETTINGS },
   };
 }
@@ -231,6 +241,14 @@ export class Library {
     const comic = this.getComic(id);
     if (!comic) return undefined;
 
+    // Only genuinely new ground counts as reading. Paging back and forth over
+    // the same spread, or re-opening a finished book, must not inflate the day.
+    const advanced = Math.max(0, page - comic.state.furthestPage);
+    if (advanced > 0) {
+      const day = new Date().toISOString().slice(0, 10);
+      this.snapshot.activity[day] = (this.snapshot.activity[day] ?? 0) + advanced;
+    }
+
     comic.state.currentPage = page;
     comic.state.furthestPage = Math.max(comic.state.furthestPage, page);
     comic.state.lastReadAt = Date.now();
@@ -285,7 +303,10 @@ export class Library {
 
   stats(): ReadingStats {
     const comics = this.snapshot.comics;
-    const pagesPerDay: Record<string, number> = {};
+    // Taken from the running log rather than derived from reading positions:
+    // a comic knows only how far it got and when it was last opened, so
+    // attributing its whole page count to that one day would be a fiction.
+    const pagesPerDay = { ...this.snapshot.activity };
     const perSeries = new Map<string, number>();
 
     let pagesRead = 0;
@@ -295,10 +316,6 @@ export class Library {
       pagesRead += comic.state.furthestPage;
       timeSpentMs += comic.state.timeSpentMs;
 
-      if (comic.state.lastReadAt) {
-        const day = new Date(comic.state.lastReadAt).toISOString().slice(0, 10);
-        pagesPerDay[day] = (pagesPerDay[day] ?? 0) + comic.state.furthestPage;
-      }
       if (comic.seriesId) {
         perSeries.set(comic.seriesId, (perSeries.get(comic.seriesId) ?? 0) + comic.state.furthestPage);
       }

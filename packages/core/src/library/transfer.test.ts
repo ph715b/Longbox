@@ -185,3 +185,19 @@ test('importing the same file twice changes nothing the second time', () => {
   const twice = mergeImport(once.snapshot, buildExport(backup));
   assert.equal(twice.summary.progressUpdated, 0, 'import must be idempotent');
 });
+
+test('the reading log merges by day and does not double on re-import', () => {
+  const backup: LibrarySnapshot = {
+    ...snapshotOf([]),
+    activity: { '2026-08-01': 40, '2026-08-02': 10 },
+  };
+  const current: LibrarySnapshot = { ...snapshotOf([]), activity: { '2026-08-02': 25 } };
+
+  const once = mergeImport(current, buildExport(backup));
+  assert.deepEqual(once.snapshot.activity, { '2026-08-01': 40, '2026-08-02': 25 });
+  assert.equal(once.summary.activityDaysMerged, 1);
+
+  const twice = mergeImport(once.snapshot, buildExport(backup));
+  assert.deepEqual(twice.snapshot.activity, { '2026-08-01': 40, '2026-08-02': 25 });
+  assert.equal(twice.summary.activityDaysMerged, 0, 'must not accumulate');
+});

@@ -1,6 +1,7 @@
 import type {
   Collection,
   Comic,
+  DuplicateGroup,
   ImportOptions,
   ImportSummary,
   LibraryFolder,
@@ -41,6 +42,18 @@ export type ImportResult =
   | { ok: false; cancelled: true }
   | { ok: false; cancelled: false; error: string };
 
+export interface DuplicateReport {
+  groups: DuplicateGroup[];
+  /** Bytes that would be freed by keeping only the first of each group. */
+  wastedBytes: number;
+}
+
+export interface CoverHashResult {
+  hashed: number;
+  failed: number;
+  cancelled: boolean;
+}
+
 export interface LongboxApi {
   getSnapshot(): Promise<LibrarySnapshotView>;
   getStats(): Promise<ReadingStats>;
@@ -61,6 +74,13 @@ export interface LongboxApi {
 
   setSeriesPreferences(seriesId: string, preferences: SeriesPreferences): Promise<Series[]>;
   updateSettings(patch: Partial<LibrarySettings>): Promise<LibrarySettings>;
+
+  saveCollection(collection: Collection): Promise<Collection[]>;
+  removeCollection(id: string): Promise<Collection[]>;
+  setCollectionMembers(id: string, comicIds: string[], member: boolean): Promise<Collection[]>;
+
+  findDuplicates(): Promise<DuplicateReport>;
+  hashCovers(): Promise<CoverHashResult>;
 
   exportLibrary(): Promise<ExportResult>;
   importLibrary(options?: ImportOptions): Promise<ImportResult>;

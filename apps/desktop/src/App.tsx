@@ -17,10 +17,20 @@ import type {
   SortField,
 } from '@longbox/core';
 import { ComicCard } from './ComicCard.tsx';
+import { CollectionsView } from './Collections.tsx';
+import { Duplicates } from './Duplicates.tsx';
 import { Reader } from './Reader.tsx';
+import { Stats } from './Stats.tsx';
 import { useLibrary } from './useLibrary.ts';
 
-type View = 'library' | 'series' | 'reading' | 'settings';
+type View = 'library' | 'series' | 'reading' | 'collections' | 'stats' | 'duplicates' | 'settings';
+
+/**
+ * Views that stand on their own and must not be replaced by the "library is
+ * empty" prompt -- settings and backup are exactly where someone with an empty
+ * library needs to go, and the rest explain their own emptiness.
+ */
+const STANDALONE_VIEWS = new Set<View>(['settings', 'collections', 'stats', 'duplicates']);
 
 const SORT_OPTIONS: { value: SortField; label: string }[] = [
   { value: 'series', label: 'Series' },
@@ -41,7 +51,16 @@ export function App() {
   const [sortField, setSortField] = useState<SortField>('series');
   const [sortDescending, setSortDescending] = useState(false);
   const [openSeriesId, setOpenSeriesId] = useState<string | undefined>();
+  const [openCollectionId, setOpenCollectionId] = useState<string | undefined>();
   const [reading, setReading] = useState<Comic | undefined>();
+
+  // Bumped whenever the library changes underneath a view that fetched derived
+  // data of its own, so stats and duplicate reports do not go stale.
+  const [dataVersion, setDataVersion] = useState(0);
+  const noteChanged = useCallback(() => {
+    void library.refresh();
+    setDataVersion((value) => value + 1);
+  }, [library]);
 
   // Reader preferences start from the global defaults and are overridden per
   // series once the user changes them while reading that series.
@@ -184,6 +203,28 @@ export function App() {
               setReadStatus('unread');
             }}
           />
+          <NavItem
+            icon="▤"
+            label="Collections"
+            count={library.collections.length}
+            active={view === 'collections'}
+            onClick={() => {
+              setView('collections');
+              setOpenCollectionId(undefined);
+            }}
+          />
+          <NavItem
+            icon="▨"
+            label="Stats"
+            active={view === 'stats'}
+            onClick={() => setView('stats')}
+          />
+          <NavItem
+            icon="⧉"
+            label="Duplicates"
+            active={view === 'duplicates'}
+            onClick={() => setView('duplicates')}
+          />
         </div>
 
         <div style={{ marginTop: 'auto' }}>
@@ -244,7 +285,7 @@ export function App() {
         )}
 
         <div className="content">
-          {library.loading ? null : library.comics.length === 0 && view !== 'settings' ? (
+          {library.loading ? null : library.comics.length === 0 && !STANDALONE_VIEWS.has(view) ? (
             <EmptyLibrary
               hasFolders={library.folders.length > 0}
               onAddFolder={() => void library.addFolder().then((added) => {
@@ -276,6 +317,19 @@ export function App() {
                 ))}
               </div>
             )
+          ) : view === 'collections' ? (
+            <CollectionsView
+              collections={library.collections}
+              comics={library.comics}
+              openId={openCollectionId}
+              onOpen={setOpenCollectionId}
+              onChanged={noteChanged}
+              onOpenComic={openComic}
+            />
+          ) : view === 'stats' ? (
+            <Stats refreshKey={dataVersion} />
+          ) : view === 'duplicates' ? (
+            <Duplicates comics={library.comics} onChanged={noteChanged} />
           ) : view === 'settings' ? (
             <Settings library={library} />
           ) : visibleComics.length === 0 ? (
