@@ -656,7 +656,11 @@ function EmptyLibrary({
       <p>
         {hasFolders
           ? 'The folders you added did not contain any readable comics. Scan again after adding files, or add another folder.'
-          : 'Point Longbox at the folder where you keep your downloads. It reads CBZ, CBR, CBT, and PDF, and never moves or changes your files unless you ask it to.'}
+          : 'Point Longbox at the folder where you keep your comics. It reads CBZ, CBR, CBT, and PDF, and never moves or changes your files unless you ask it to.'}
+      </p>
+      <p className="hint">
+        You can also drag comics or a folder onto this window from anywhere — drop them wherever
+        you like, the whole window accepts them.
       </p>
       <div style={{ display: 'flex', gap: 8 }}>
         <button className="btn primary" onClick={onAddFolder}>
@@ -824,6 +828,9 @@ function Settings({ library }: { library: ReturnType<typeof useLibrary> }) {
     <div className="panel">
       <section>
         <h2>Watched folders</h2>
+        <p className="hint">
+          Drop comics or a folder anywhere on the window to add them without coming here.
+        </p>
         <p className="hint">
           Longbox indexes these folders. It reads your files in place and never moves, renames, or
           deletes anything on its own.
