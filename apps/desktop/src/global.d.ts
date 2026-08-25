@@ -54,6 +54,15 @@ export interface CoverHashResult {
   cancelled: boolean;
 }
 
+export interface AddPathsResult {
+  added: number;
+  updated: number;
+  foldersAdded: number;
+  /** Dropped items that were neither a folder nor a comic we can open. */
+  skipped: number;
+  errors: { path: string; message: string }[];
+}
+
 export interface LongboxApi {
   getSnapshot(): Promise<LibrarySnapshotView>;
   getStats(): Promise<ReadingStats>;
@@ -63,6 +72,8 @@ export interface LongboxApi {
   removeFolder(id: string): Promise<LibraryFolder[]>;
 
   scan(): Promise<ScanSummary>;
+  addPaths(paths: string[]): Promise<AddPathsResult>;
+  pathForFile(file: File): string;
   cancelScan(): Promise<void>;
   onScanProgress(handler: (progress: ScanProgress) => void): () => void;
 
@@ -78,6 +89,7 @@ export interface LongboxApi {
   saveCollection(collection: Collection): Promise<Collection[]>;
   removeCollection(id: string): Promise<Collection[]>;
   setCollectionMembers(id: string, comicIds: string[], member: boolean): Promise<Collection[]>;
+  reorderCollection(id: string, comicId: string, toIndex: number): Promise<Collection[]>;
 
   findDuplicates(): Promise<DuplicateReport>;
   hashCovers(): Promise<CoverHashResult>;

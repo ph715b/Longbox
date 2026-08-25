@@ -22,6 +22,7 @@ import { Duplicates } from './Duplicates.tsx';
 import { Reader } from './Reader.tsx';
 import { Stats } from './Stats.tsx';
 import { useLibrary } from './useLibrary.ts';
+import { COMIC_MIME, describeAdd, useFileDrop } from './useFileDrop.ts';
 
 type View = 'library' | 'series' | 'reading' | 'collections' | 'stats' | 'duplicates' | 'settings';
 
@@ -56,6 +57,8 @@ export function App() {
   const [openSeriesId, setOpenSeriesId] = useState<string | undefined>();
   const [openCollectionId, setOpenCollectionId] = useState<string | undefined>();
   const [showMissing, setShowMissing] = useState(false);
+  const [draggingComic, setDraggingComic] = useState<string>();
+  const [dropTargetCollection, setDropTargetCollection] = useState<string>();
   const [reading, setReading] = useState<Comic | undefined>();
 
   // Bumped whenever the library changes underneath a view that fetched derived
@@ -65,6 +68,17 @@ export function App() {
     void library.refresh();
     setDataVersion((value) => value + 1);
   }, [library]);
+
+  const fileDrop = useFileDrop(noteChanged);
+
+  /** Add a dragged comic to a collection in the sidebar. */
+  const dropOnCollection = useCallback(
+    async (collectionId: string, comicId: string) => {
+      await window.longbox.setCollectionMembers(collectionId, [comicId], true);
+      noteChanged();
+    },
+    [noteChanged],
+  );
 
   // Reader preferences start from the global defaults and are overridden per
   // series once the user changes them while reading that series.
@@ -118,6 +132,21 @@ export function App() {
   );
 
   /** Apply the series' saved preferences, if any, when opening a comic. */
+  /**
+   * Drag support for a cover in any library grid. The card only needs to know
+   * how to start and stop; where it lands is the drop target's business.
+   */
+  const dragComic = useCallback(
+    (comic: Comic) => ({
+      onStart: () => setDraggingComic(comic.id),
+      onEnd: () => {
+        setDraggingComic(undefined);
+        setDropTargetCollection(undefined);
+      },
+    }),
+    [],
+  );
+
   const openComic = useCallback(
     (comic: Comic) => {
       const series = library.series.find((item) => item.id === comic.seriesId);
@@ -229,6 +258,46 @@ export function App() {
               setOpenCollectionId(undefined);
             }}
           />
+          {library.collections.map((collection) => (
+            <button
+              key={collection.id}
+              className={[
+                'nav-item',
+                'nav-sub',
+                view === 'collections' && openCollectionId === collection.id ? 'active' : '',
+                dropTargetCollection === collection.id ? 'drop-target' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+              onClick={() => {
+                setView('collections');
+                setOpenCollectionId(collection.id);
+              }}
+              onDragOver={(event) => {
+                if (!draggingComic) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'copy';
+                setDropTargetCollection(collection.id);
+              }}
+              onDragLeave={() =>
+                setDropTargetCollection((current) =>
+                  current === collection.id ? undefined : current,
+                )
+              }
+              onDrop={(event) => {
+                event.preventDefault();
+                const id = event.dataTransfer.getData(COMIC_MIME) || draggingComic;
+                if (id) void dropOnCollection(collection.id, id);
+                setDropTargetCollection(undefined);
+              }}
+              title={`Drop a cover here to add it to ${collection.name}`}
+            >
+              <span className="nav-icon">·</span>
+              {collection.name}
+              <span className="count">{collection.comicIds.length}</span>
+            </button>
+          ))}
+
           <NavItem
             icon="▨"
             label="Stats"
@@ -252,6 +321,16 @@ export function App() {
           />
         </div>
       </nav>
+
+      {fileDrop.dragging && (
+        <div className="drop-overlay">
+          <div className="drop-card">
+            <span className="drop-glyph">⭳</span>
+            <b>Drop comics or a folder</b>
+            <span>Files are indexed where they are · a folder becomes a watched folder</span>
+          </div>
+        </div>
+      )}
 
       <main className="main">
         <Toolbar
@@ -300,6 +379,24 @@ export function App() {
           </div>
         )}
 
+        {fileDrop.busy && (
+          <div className="missing-banner">
+            <span className="missing-glyph">⭳</span>
+            <span>Reading what you dropped…</span>
+          </div>
+        )}
+
+        {fileDrop.result && (
+          <div className="missing-banner">
+            <span className="missing-glyph">⭳</span>
+            <span>{describeAdd(fileDrop.result)}</span>
+            <span style={{ flex: 1 }} />
+            <button className="btn" onClick={fileDrop.dismiss}>
+              Dismiss
+            </button>
+          </div>
+        )}
+
         {missingComics.length > 0 && MISSING_AWARE_VIEWS.has(view) && (
           <MissingNotice
             count={missingComics.length}
@@ -338,7 +435,12 @@ export function App() {
             ) : (
               <div className="grid">
                 {inProgress.map((comic) => (
-                  <ComicCard key={comic.id} comic={comic} onOpen={openComic} />
+                  <ComicCard
+                    key={comic.id}
+                    comic={comic}
+                    onOpen={openComic}
+                    drag={dragComic(comic)}
+                  />
                 ))}
               </div>
             )
@@ -365,7 +467,12 @@ export function App() {
           ) : (
             <div className="grid">
               {visibleComics.map((comic) => (
-                <ComicCard key={comic.id} comic={comic} onOpen={openComic} />
+                <ComicCard
+                  key={comic.id}
+                  comic={comic}
+                  onOpen={openComic}
+                  drag={dragComic(comic)}
+                />
               ))}
             </div>
           )}

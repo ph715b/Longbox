@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type React from 'react';
 import { formatComicTitle } from '@longbox/core';
 import type { Collection, Comic } from '@longbox/core';
+import { COMIC_MIME } from './useFileDrop.ts';
 
 /** Width of generated cover thumbnails, in CSS pixels before DPI scaling. */
 const THUMB_WIDTH = 340;
@@ -52,6 +54,20 @@ interface ComicCardProps {
   /** When given, the cover carries a control for adding to these collections. */
   collections?: Collection[];
   onCollectionsChanged?: () => void;
+  /**
+   * Makes the card draggable, and optionally a drop target for another card.
+   * Absent means the card does not participate in dragging at all.
+   */
+  drag?: {
+    onStart: () => void;
+    onEnd: () => void;
+    onOver?: (event: React.DragEvent) => void;
+    onDrop?: () => void;
+    /** This card is the one being dragged. */
+    lifted?: boolean;
+    /** A dragged card would land here. */
+    over?: boolean;
+  };
 }
 
 export function ComicCard({
@@ -61,6 +77,7 @@ export function ComicCard({
   subtitle,
   collections,
   onCollectionsChanged,
+  drag,
 }: ComicCardProps) {
   const [failed, setFailed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -116,9 +133,37 @@ export function ComicCard({
     // A div rather than a button: the collections control is itself a button and
     // one cannot be nested inside another.
     <div
-      className={`card ${comic.missing ? 'is-missing' : ''}`}
+      className={[
+        'card',
+        comic.missing ? 'is-missing' : '',
+        drag?.lifted ? 'is-lifted' : '',
+        drag?.over ? 'is-drop-target' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       role="button"
       tabIndex={0}
+      draggable={drag !== undefined}
+      onDragStart={(event) => {
+        if (!drag) return;
+        // A payload has to be set or Firefox-style drags never start, and the
+        // custom type is what tells the window-wide file drop zone to ignore us.
+        event.dataTransfer.setData(COMIC_MIME, comic.id);
+        event.dataTransfer.effectAllowed = 'move';
+        drag.onStart();
+      }}
+      onDragEnd={() => drag?.onEnd()}
+      onDragOver={(event) => {
+        if (!drag?.onOver) return;
+        event.preventDefault();
+        drag.onOver(event);
+      }}
+      onDrop={(event) => {
+        if (!drag?.onDrop) return;
+        event.preventDefault();
+        event.stopPropagation();
+        drag.onDrop();
+      }}
       onClick={() => onOpen(comic)}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {

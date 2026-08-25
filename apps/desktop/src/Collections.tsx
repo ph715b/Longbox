@@ -34,6 +34,8 @@ export function CollectionsView({
   const [draftName, setDraftName] = useState('');
   const [renaming, setRenaming] = useState<string>();
   const [renameDraft, setRenameDraft] = useState('');
+  const [lifted, setLifted] = useState<string>();
+  const [over, setOver] = useState<string>();
 
   const byId = useMemo(() => new Map(comics.map((comic) => [comic.id, comic])), [comics]);
   const open = collections.find((collection) => collection.id === openId);
@@ -71,6 +73,20 @@ export function CollectionsView({
     [openId, onOpen, onChanged],
   );
 
+  /** Drop one comic in front of another, which is the whole point of a queue. */
+  const moveBefore = useCallback(
+    async (collectionId: string, comicId: string, beforeId: string, order: string[]) => {
+      if (comicId === beforeId) return;
+      // The index is taken from the list with the dragged comic removed, which
+      // is the order the main process will splice into.
+      const without = order.filter((id) => id !== comicId);
+      const target = without.indexOf(beforeId);
+      await window.longbox.reorderCollection(collectionId, comicId, target);
+      onChanged();
+    },
+    [onChanged],
+  );
+
   if (open) {
     // Missing ids are skipped rather than shown as gaps: a comic can be removed
     // from the library while a collection still lists it.
@@ -93,7 +109,8 @@ export function CollectionsView({
 
           {members.length === 0 ? (
             <p className="hint">
-              Nothing here yet. Add comics from the library with the <b>+</b> on a cover.
+              Nothing here yet. Add comics from the library with the <b>+</b> on a cover, or drag a
+              cover onto this collection in the sidebar.
             </p>
           ) : (
             <div className="grid">
@@ -104,6 +121,22 @@ export function CollectionsView({
                   onOpen={onOpenComic}
                   collections={collections}
                   onCollectionsChanged={onChanged}
+                  drag={{
+                    onStart: () => setLifted(comic.id),
+                    onEnd: () => {
+                      setLifted(undefined);
+                      setOver(undefined);
+                    },
+                    onOver: () => setOver(comic.id),
+                    onDrop: () => {
+                      if (lifted) {
+                        void moveBefore(open.id, lifted, comic.id, open.comicIds);
+                      }
+                      setOver(undefined);
+                    },
+                    lifted: lifted === comic.id,
+                    over: over === comic.id && lifted !== comic.id,
+                  }}
                 />
               ))}
             </div>
@@ -118,8 +151,10 @@ export function CollectionsView({
       <section>
         <h2>Collections</h2>
         <p className="hint">
-          Ordered lists you make by hand — a reading queue, a re-read, anything. Removing a comic
-          from a collection leaves the comic and its file alone.
+          Ordered lists you make by hand — a reading queue, a re-read, anything. Drag a cover from
+          the library onto a collection in the sidebar to add it, and drag covers inside a
+          collection to reorder them. Removing a comic from a collection leaves the comic and its
+          file alone.
         </p>
 
         <div className="folder-row">

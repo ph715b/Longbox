@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
 
 /**
  * The only channel between the renderer and the rest of the machine.
@@ -20,6 +20,16 @@ const api = {
   removeFolder: (id: string) => ipcRenderer.invoke('library:removeFolder', id),
 
   scan: () => ipcRenderer.invoke('library:scan'),
+  addPaths: (paths: string[]) => ipcRenderer.invoke('library:addPaths', paths),
+
+  /**
+   * The real path behind a dropped File.
+   *
+   * Electron 32 removed the non-standard File.path property; this is the
+   * supported replacement, and it has to live here because webUtils is a main
+   * -world API the renderer cannot reach on its own.
+   */
+  pathForFile: (file: File) => webUtils.getPathForFile(file),
   cancelScan: () => ipcRenderer.invoke('library:cancelScan'),
 
   /** Subscribe to scan progress. Returns an unsubscribe function. */
@@ -47,6 +57,8 @@ const api = {
   removeCollection: (id: string) => ipcRenderer.invoke('collection:remove', id),
   setCollectionMembers: (id: string, comicIds: string[], member: boolean) =>
     ipcRenderer.invoke('collection:setMembers', id, comicIds, member),
+  reorderCollection: (id: string, comicId: string, toIndex: number) =>
+    ipcRenderer.invoke('collection:reorder', id, comicId, toIndex),
 
   // --- Duplicates ---------------------------------------------------------
   findDuplicates: () => ipcRenderer.invoke('library:duplicates'),

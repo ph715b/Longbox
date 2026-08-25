@@ -1,11 +1,12 @@
 import { app, BrowserWindow, dialog, ipcMain, protocol, shell } from 'electron';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import {
   Library,
   buildExport,
   coverHash,
+  formatFromExtension,
   duplicateWaste,
   findDuplicates,
   hash64,
@@ -20,7 +21,7 @@ import type {
   LibrarySnapshot,
 } from '@longbox/core';
 import { getArchive, closeAll, invalidate } from './archiveCache.ts';
-import { scanFolders } from './scanner.ts';
+import { scanFile, scanFolders } from './scanner.ts';
 
 /**
  * Electron main process: owns the filesystem, the library, and the window.
@@ -191,6 +192,13 @@ function createWindow(): void {
   // Avoid the white flash before React has painted anything.
   mainWindow.once('ready-to-show', () => mainWindow?.show());
 
+  // A file dropped outside a drop zone would otherwise be loaded as the
+  // window's document, replacing the app with the raw archive. The renderer
+  // cancels these too; this is the backstop for anything it misses.
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (url !== mainWindow?.webContents.getURL()) event.preventDefault();
+  });
+
   // Send external links to the real browser instead of opening app windows.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url);
@@ -270,6 +278,69 @@ function registerIpc(): void {
     return { added, updated, errors: result.errors, cancelled: result.cancelled };
   });
 
+  /**
+   * Take paths dropped onto the window.
+   *
+   * A folder becomes a watched folder and is scanned, which is what dropping a
+   * folder plainly means. Loose files are indexed exactly where they lie rather
+   * than quietly adopting their parent directory, which could be a hundred
+   * unrelated comics the user never asked for. Those files stay put across
+   * later scans: the missing check only considers comics beneath a watched
+   * root, so an indexed loose file is never mistaken for one that vanished.
+   */
+  ipcMain.handle('library:addPaths', async (_event, paths: string[]) => {
+    scanCancelled = false;
+
+    const files: string[] = [];
+    const folders: string[] = [];
+    const errors: { path: string; message: string }[] = [];
+    let skipped = 0;
+
+    for (const path of paths) {
+      try {
+        const info = await stat(path);
+        if (info.isDirectory()) folders.push(path);
+        else if (formatFromExtension(basename(path))) files.push(path);
+        else skipped += 1;
+      } catch {
+        skipped += 1;
+      }
+    }
+
+    const found: Comic[] = [];
+
+    for (const file of files) {
+      try {
+        found.push(await scanFile(file));
+      } catch (error) {
+        errors.push({ path: file, message: error instanceof Error ? error.message : String(error) });
+      }
+    }
+
+    let foldersAdded = 0;
+    for (const folder of folders) {
+      const id = hash64(folder);
+      if (library.folders.some((existing) => existing.id === id)) continue;
+      library.addFolder({ id, path: folder, recursive: true, enabled: true });
+      foldersAdded += 1;
+    }
+
+    if (folders.length > 0) {
+      const result = await scanFolders(folders, {
+        recursive: true,
+        isCancelled: () => scanCancelled,
+        onProgress: (progress) => mainWindow?.webContents.send('scan:progress', progress),
+      });
+      found.push(...result.comics);
+      errors.push(...result.errors);
+    }
+
+    const { added, updated } = library.upsertComics(found);
+    await library.flush();
+
+    return { added, updated, foldersAdded, skipped, errors };
+  });
+
   ipcMain.handle('library:cancelScan', () => {
     scanCancelled = true;
   });
@@ -341,6 +412,27 @@ function registerIpc(): void {
         : collection.comicIds.filter((cid) => !wanted.has(cid));
 
       library.upsertCollection({ ...collection, comicIds: next });
+      return library.collections;
+    },
+  );
+
+  /**
+   * Move one comic within a collection.
+   *
+   * Expressed as a move rather than a whole new list so two windows reordering
+   * at once cannot overwrite each other with a stale copy of the order.
+   */
+  ipcMain.handle(
+    'collection:reorder',
+    (_event, id: string, comicId: string, toIndex: number) => {
+      const collection = library.collections.find((entry) => entry.id === id);
+      if (!collection) return library.collections;
+
+      const without = collection.comicIds.filter((existing) => existing !== comicId);
+      const target = Math.max(0, Math.min(toIndex, without.length));
+      without.splice(target, 0, comicId);
+
+      library.upsertCollection({ ...collection, comicIds: without });
       return library.collections;
     },
   );
