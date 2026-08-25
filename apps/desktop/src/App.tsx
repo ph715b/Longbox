@@ -354,6 +354,8 @@ export function App() {
           onToggleSortDirection={() => setSortDescending((value) => !value)}
           scanning={library.scanning}
           onScan={() => void library.scan()}
+          onAddComics={() => void fileDrop.pick()}
+          adding={fileDrop.planning}
           hasFolders={library.folders.length > 0}
           openSeriesName={
             openSeriesId ? library.series.find((s) => s.id === openSeriesId)?.name : undefined
@@ -411,6 +413,7 @@ export function App() {
               onAddFolder={() => void library.addFolder().then((added) => {
                 if (added) void library.scan();
               })}
+              onAddComics={() => void fileDrop.pick()}
               onScan={() => void library.scan()}
             />
           ) : openSeriesId ? (
@@ -554,6 +557,8 @@ function Toolbar(props: {
   onToggleSortDirection: () => void;
   scanning: boolean;
   onScan: () => void;
+  onAddComics: () => void;
+  adding: boolean;
   hasFolders: boolean;
   openSeriesName?: string;
   onBack: () => void;
@@ -632,6 +637,17 @@ function Toolbar(props: {
         </>
       )}
 
+      {props.view !== 'settings' && (
+        <button
+          className="btn"
+          onClick={props.onAddComics}
+          disabled={props.adding}
+          title="Choose comics to add. You can also drop them anywhere on the window."
+        >
+          {props.adding ? 'Reading…' : '+ Add comics'}
+        </button>
+      )}
+
       {props.hasFolders && (
         <button className="btn primary" onClick={props.onScan} disabled={props.scanning}>
           {props.scanning ? 'Scanning…' : 'Scan'}
@@ -644,10 +660,12 @@ function Toolbar(props: {
 function EmptyLibrary({
   hasFolders,
   onAddFolder,
+  onAddComics,
   onScan,
 }: {
   hasFolders: boolean;
   onAddFolder: () => void;
+  onAddComics: () => void;
   onScan: () => void;
 }) {
   return (
@@ -665,6 +683,9 @@ function EmptyLibrary({
       <div style={{ display: 'flex', gap: 8 }}>
         <button className="btn primary" onClick={onAddFolder}>
           Add a folder
+        </button>
+        <button className="btn" onClick={onAddComics}>
+          Add comics
         </button>
         {hasFolders && (
           <button className="btn" onClick={onScan}>

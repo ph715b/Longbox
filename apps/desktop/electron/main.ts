@@ -7,6 +7,7 @@ import {
   buildExport,
   coverHash,
   formatFromExtension,
+  SUPPORTED_EXTENSIONS,
   duplicateWaste,
   findDuplicates,
   hash64,
@@ -232,6 +233,25 @@ function registerIpc(): void {
   }));
 
   ipcMain.handle('library:stats', () => library.stats());
+
+  /**
+   * Choose comics with a picker rather than a drag.
+   *
+   * Returns paths only. Everything after this is the same code a drop runs
+   * through, so the two ways in cannot drift apart in how they file things.
+   */
+  ipcMain.handle('comics:pick', async () => {
+    if (!mainWindow) return [];
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Add comics',
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        { name: 'Comics', extensions: [...SUPPORTED_EXTENSIONS] },
+        { name: 'All files', extensions: ['*'] },
+      ],
+    });
+    return result.canceled ? [] : result.filePaths;
+  });
 
   ipcMain.handle('folder:pick', async () => {
     if (!mainWindow) return undefined;

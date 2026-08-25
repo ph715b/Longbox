@@ -15,6 +15,7 @@ const api = {
   getStats: () => ipcRenderer.invoke('library:stats'),
 
   pickFolder: () => ipcRenderer.invoke('folder:pick'),
+  pickComics: () => ipcRenderer.invoke('comics:pick'),
   addFolder: (path: string, recursive = true) =>
     ipcRenderer.invoke('library:addFolder', path, recursive),
   removeFolder: (id: string) => ipcRenderer.invoke('library:removeFolder', id),

@@ -28,6 +28,29 @@ export function useFileDrop(onChanged: () => void) {
   const [planning, setPlanning] = useState(false);
   const [plan, setPlan] = useState<DropPlan>();
 
+  /**
+   * Plan a set of paths, however they arrived. Held in a ref as well so the
+   * drop listener can call the current version without being torn down and
+   * rebuilt every render.
+   */
+  const planPaths = useCallback(
+    (paths: string[]) => {
+      if (paths.length === 0) return;
+      setPlanning(true);
+      void window.longbox
+        .planDrop(paths)
+        .then((next) => {
+          setPlan(next);
+          onChanged();
+        })
+        .finally(() => setPlanning(false));
+    },
+    [onChanged],
+  );
+
+  const latestPlan = useRef(planPaths);
+  latestPlan.current = planPaths;
+
   // Drag events fire for every child element entered, so a plain leave handler
   // would flicker. Counting enters and leaves is the reliable way to know when
   // the pointer has actually left the window.
@@ -64,22 +87,7 @@ export function useFileDrop(onChanged: () => void) {
       if (files.length === 0) return;
 
       const paths = files.map((file) => window.longbox.pathForFile(file)).filter(Boolean);
-      if (paths.length === 0) return;
-
-      setPlanning(true);
-      void window.longbox
-        .planDrop(paths)
-        .then((next) => {
-          // Dropping only folders adopts them outright and needs no dialog.
-          if (next.candidates.length === 0) {
-            onChanged();
-            if (next.foldersAdded > 0 || next.added > 0) setPlan(next);
-            return;
-          }
-          setPlan(next);
-          onChanged();
-        })
-        .finally(() => setPlanning(false));
+      latestPlan.current(paths);
     };
 
     window.addEventListener('dragenter', onEnter);
@@ -93,9 +101,14 @@ export function useFileDrop(onChanged: () => void) {
       window.removeEventListener('dragleave', onLeave);
       window.removeEventListener('drop', onDrop);
     };
-  }, [onChanged]);
+  }, []);
+
+  /** Pick comics with a dialog, then plan them exactly as a drop would. */
+  const pick = useCallback(async () => {
+    planPaths(await window.longbox.pickComics());
+  }, [planPaths]);
 
   const dismiss = useCallback(() => setPlan(undefined), []);
 
-  return { dragging, planning, plan, dismiss };
+  return { dragging, planning, plan, dismiss, pick };
 }

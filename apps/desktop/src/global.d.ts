@@ -106,6 +106,7 @@ export interface LongboxApi {
   getStats(): Promise<ReadingStats>;
 
   pickFolder(): Promise<string | undefined>;
+  pickComics(): Promise<string[]>;
   addFolder(path: string, recursive?: boolean): Promise<LibraryFolder[]>;
   removeFolder(id: string): Promise<LibraryFolder[]>;
 
