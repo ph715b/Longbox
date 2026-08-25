@@ -12,6 +12,8 @@
     "dev": "npm run dev --workspace=@longbox/desktop",
     "build": "npm run build --workspace=@longbox/desktop",
     "dist": "npm run dist --workspace=@longbox/desktop",
+    "dist:dir": "npm run dist:dir --workspace=@longbox/desktop",
+    "preview": "npm run preview --workspace=@longbox/desktop",
     "test": "node --experimental-strip-types --test \"packages/core/src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
