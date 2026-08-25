@@ -14,7 +14,7 @@
     "dist": "npm run dist --workspace=@longbox/desktop",
     "dist:dir": "npm run dist:dir --workspace=@longbox/desktop",
     "preview": "npm run preview --workspace=@longbox/desktop",
-    "test": "node --experimental-strip-types --test \"packages/core/src/**/*.test.ts\"",
+    "test": "node --experimental-strip-types --test \"packages/core/src/**/*.test.ts\" \"apps/desktop/electron/**/*.test.ts\"",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {

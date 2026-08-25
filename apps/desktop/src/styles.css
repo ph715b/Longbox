@@ -1330,3 +1330,12 @@ select.btn {
 .filing-row .filing-detail {
   flex: 1 1 40%;
 }
+
+/* The exact destination, so a wrong folder is visible before it happens. */
+.filing-target {
+  overflow: hidden;
+  color: var(--accent);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

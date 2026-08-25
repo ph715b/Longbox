@@ -60,6 +60,53 @@ export async function listDestinations(roots: string[]): Promise<Destination[]> 
   return found;
 }
 
+/**
+ * Folders a new series folder could reasonably be created in.
+ *
+ * The watched roots themselves are always offered, but they are not always the
+ * right answer: someone can watch each series folder individually, in which
+ * case every root is a *sibling* of the folder being created and putting one
+ * inside another nests a series under an unrelated one. So the deepest folder
+ * that contains every root is offered too, and preferred, because that is the
+ * library folder in all but name.
+ */
+export function listParents(roots: string[]): Destination[] {
+  const parents: Destination[] = roots.map((root) => ({
+    path: root,
+    label: root,
+    root,
+  }));
+
+  const shared = commonParent(roots);
+  if (shared && !roots.some((root) => root.toLowerCase() === shared.toLowerCase())) {
+    parents.unshift({ path: shared, label: shared, root: shared });
+  }
+
+  return parents;
+}
+
+/** The deepest directory containing all of the given paths. */
+function commonParent(paths: string[]): string | undefined {
+  if (paths.length === 0) return undefined;
+  // One watched folder is the library folder. Offering its parent would put new
+  // series alongside the library rather than inside it, where nothing scans.
+  if (paths.length === 1) return undefined;
+
+  const split = paths.map((path) => path.split(/[\\/]/));
+  const shortest = Math.min(...split.map((parts) => parts.length));
+  const common: string[] = [];
+
+  for (let i = 0; i < shortest; i += 1) {
+    const part = split[0][i];
+    if (!split.every((parts) => parts[i].toLowerCase() === part.toLowerCase())) break;
+    common.push(part);
+  }
+
+  // A drive letter on its own is not a library folder.
+  if (common.length < 2) return undefined;
+  return common.join('\\');
+}
+
 export interface FilingCandidate {
   source: string;
   filename: string;

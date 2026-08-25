@@ -72,6 +72,8 @@ export interface FilingCandidate {
 export interface DropPlan {
   candidates: FilingCandidate[];
   destinations: Destination[];
+  /** Folders a new series folder could be created in. */
+  parents: Destination[];
   foldersAdded: number;
   added: number;
   updated: number;
@@ -99,6 +101,8 @@ export interface FilingResult {
   added: number;
   updated: number;
   errors: { path: string; message: string }[];
+  /** Folders newly watched because a comic was filed outside every root. */
+  adopted: string[];
 }
 
 export interface LongboxApi {

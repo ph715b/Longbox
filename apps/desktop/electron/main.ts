@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, protocol, shell } from 'electron';
 import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import {
   Library,
   buildExport,
@@ -23,7 +23,7 @@ import type {
 } from '@longbox/core';
 import { getArchive, closeAll, invalidate } from './archiveCache.ts';
 import { scanFile, scanFolders } from './scanner.ts';
-import { fileComics, listDestinations, planFiling } from './filing.ts';
+import { fileComics, listDestinations, listParents, planFiling } from './filing.ts';
 import type { FilingInstruction } from './filing.ts';
 
 /**
@@ -384,6 +384,7 @@ function registerIpc(): void {
     return {
       candidates: await planFiling(files, destinations),
       destinations,
+      parents: listParents(roots),
       foldersAdded,
       added,
       updated,
@@ -413,10 +414,26 @@ function registerIpc(): void {
       }
     }
 
+    // A comic filed somewhere no watched root covers would be indexed once and
+    // then never seen again. Adopting the folder keeps it in the library.
+    const roots = library.folders.filter((folder) => folder.enabled).map((folder) => folder.path);
+    const adopted: string[] = [];
+
+    for (const outcome of outcomes) {
+      if (outcome.status !== 'moved' || !outcome.path) continue;
+      const dir = dirname(outcome.path);
+      if (roots.some((root) => dir.toLowerCase().startsWith(root.toLowerCase()))) continue;
+      const id = hash64(dir);
+      if (library.folders.some((folder) => folder.id === id)) continue;
+      library.addFolder({ id, path: dir, recursive: true, enabled: true });
+      roots.push(dir);
+      adopted.push(dir);
+    }
+
     const { added, updated } = library.upsertComics(found);
     await library.flush();
 
-    return { outcomes, added, updated, errors };
+    return { outcomes, added, updated, errors, adopted };
   });
 
   ipcMain.handle('library:cancelScan', () => {
