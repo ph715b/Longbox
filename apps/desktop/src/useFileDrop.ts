@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AddPathsResult } from './global.d.ts';
+import type { DropPlan } from './global.d.ts';
 
 /**
  * Accepting comics dropped from Explorer.
@@ -8,6 +8,10 @@ import type { AddPathsResult } from './global.d.ts';
  * navigate to a dropped file, or Chromium replaces the whole app with the raw
  * archive; and the real path has to come from `webUtils` in the preload, since
  * Electron 32 removed the non-standard `File.path`.
+ *
+ * A drop is planned, never carried out here. Where a comic belongs is a
+ * judgement a filename cannot be trusted with, so the plan goes to the user for
+ * confirmation and only then moves anything.
  */
 
 /** MIME type dragged between views inside the app, distinct from file drops. */
@@ -19,10 +23,10 @@ function carriesFiles(transfer: DataTransfer | null): boolean {
   return !!transfer && Array.from(transfer.types).includes('Files');
 }
 
-export function useFileDrop(onAdded: () => void) {
+export function useFileDrop(onChanged: () => void) {
   const [dragging, setDragging] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<AddPathsResult>();
+  const [planning, setPlanning] = useState(false);
+  const [plan, setPlan] = useState<DropPlan>();
 
   // Drag events fire for every child element entered, so a plain leave handler
   // would flicker. Counting enters and leaves is the reliable way to know when
@@ -62,15 +66,20 @@ export function useFileDrop(onAdded: () => void) {
       const paths = files.map((file) => window.longbox.pathForFile(file)).filter(Boolean);
       if (paths.length === 0) return;
 
-      setBusy(true);
-      setResult(undefined);
+      setPlanning(true);
       void window.longbox
-        .addPaths(paths)
+        .planDrop(paths)
         .then((next) => {
-          setResult(next);
-          onAdded();
+          // Dropping only folders adopts them outright and needs no dialog.
+          if (next.candidates.length === 0) {
+            onChanged();
+            if (next.foldersAdded > 0 || next.added > 0) setPlan(next);
+            return;
+          }
+          setPlan(next);
+          onChanged();
         })
-        .finally(() => setBusy(false));
+        .finally(() => setPlanning(false));
     };
 
     window.addEventListener('dragenter', onEnter);
@@ -84,24 +93,9 @@ export function useFileDrop(onAdded: () => void) {
       window.removeEventListener('dragleave', onLeave);
       window.removeEventListener('drop', onDrop);
     };
-  }, [onAdded]);
+  }, [onChanged]);
 
-  const dismiss = useCallback(() => setResult(undefined), []);
+  const dismiss = useCallback(() => setPlan(undefined), []);
 
-  return { dragging, busy, result, dismiss };
-}
-
-/** A sentence describing what a drop actually did. */
-export function describeAdd(result: AddPathsResult): string {
-  const parts: string[] = [];
-  if (result.added > 0) parts.push(`${result.added} added`);
-  if (result.updated > 0) parts.push(`${result.updated} already indexed`);
-  if (result.foldersAdded > 0) {
-    parts.push(`${result.foldersAdded} folder${result.foldersAdded === 1 ? '' : 's'} now watched`);
-  }
-  if (result.skipped > 0) parts.push(`${result.skipped} skipped`);
-  if (result.errors.length > 0) {
-    parts.push(`${result.errors.length} could not be read`);
-  }
-  return parts.length > 0 ? parts.join(' · ') : 'Nothing to add.';
+  return { dragging, planning, plan, dismiss };
 }

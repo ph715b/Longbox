@@ -22,7 +22,8 @@ import { Duplicates } from './Duplicates.tsx';
 import { Reader } from './Reader.tsx';
 import { Stats } from './Stats.tsx';
 import { useLibrary } from './useLibrary.ts';
-import { COMIC_MIME, describeAdd, useFileDrop } from './useFileDrop.ts';
+import { COMIC_MIME, useFileDrop } from './useFileDrop.ts';
+import { FilingDialog } from './FilingDialog.tsx';
 
 type View = 'library' | 'series' | 'reading' | 'collections' | 'stats' | 'duplicates' | 'settings';
 
@@ -322,12 +323,20 @@ export function App() {
         </div>
       </nav>
 
+      {fileDrop.plan && (
+        <FilingDialog
+          plan={fileDrop.plan}
+          onClose={fileDrop.dismiss}
+          onFiled={noteChanged}
+        />
+      )}
+
       {fileDrop.dragging && (
         <div className="drop-overlay">
           <div className="drop-card">
             <span className="drop-glyph">⭳</span>
             <b>Drop comics or a folder</b>
-            <span>Files are indexed where they are · a folder becomes a watched folder</span>
+            <span>You choose where comics are filed · a folder becomes a watched folder</span>
           </div>
         </div>
       )}
@@ -379,21 +388,10 @@ export function App() {
           </div>
         )}
 
-        {fileDrop.busy && (
+        {fileDrop.planning && (
           <div className="missing-banner">
             <span className="missing-glyph">⭳</span>
             <span>Reading what you dropped…</span>
-          </div>
-        )}
-
-        {fileDrop.result && (
-          <div className="missing-banner">
-            <span className="missing-glyph">⭳</span>
-            <span>{describeAdd(fileDrop.result)}</span>
-            <span style={{ flex: 1 }} />
-            <button className="btn" onClick={fileDrop.dismiss}>
-              Dismiss
-            </button>
           </div>
         )}
 

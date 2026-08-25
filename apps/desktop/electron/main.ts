@@ -22,6 +22,8 @@ import type {
 } from '@longbox/core';
 import { getArchive, closeAll, invalidate } from './archiveCache.ts';
 import { scanFile, scanFolders } from './scanner.ts';
+import { fileComics, listDestinations, planFiling } from './filing.ts';
+import type { FilingInstruction } from './filing.ts';
 
 /**
  * Electron main process: owns the filesystem, the library, and the window.
@@ -271,6 +273,22 @@ function registerIpc(): void {
       const vanished = library.comics
         .filter((comic) => !seen.has(comic.id) && roots.some((root) => comic.path.startsWith(root)))
         .map((comic) => comic.id);
+
+      // A comic filed nowhere in particular -- left where it was dropped --
+      // sits under no watched root, so the sweep above cannot see it. Checking
+      // those directly is what stops one deleted from a Downloads folder
+      // lingering as an unexplained tile that nothing ever flags.
+      const loose = library.comics.filter(
+        (comic) => !comic.missing && !roots.some((root) => comic.path.startsWith(root)),
+      );
+      for (const comic of loose) {
+        try {
+          await stat(comic.path);
+        } catch {
+          vanished.push(comic.id);
+        }
+      }
+
       library.markMissing(vanished);
     }
 
@@ -288,12 +306,20 @@ function registerIpc(): void {
    * later scans: the missing check only considers comics beneath a watched
    * root, so an indexed loose file is never mistaken for one that vanished.
    */
-  ipcMain.handle('library:addPaths', async (_event, paths: string[]) => {
+  /**
+   * First half of a drop: sort out what landed, and work out where the comics
+   * among it probably belong.
+   *
+   * A dropped folder is adopted straight away -- that is plainly what dropping
+   * a folder means, and there is no judgement call in it. Loose files are only
+   * planned, never moved, because deciding which folder a comic belongs in is
+   * the one part of this a filename cannot be trusted with.
+   */
+  ipcMain.handle('library:planDrop', async (_event, paths: string[]) => {
     scanCancelled = false;
 
     const files: string[] = [];
     const folders: string[] = [];
-    const errors: { path: string; message: string }[] = [];
     let skipped = 0;
 
     for (const path of paths) {
@@ -307,16 +333,6 @@ function registerIpc(): void {
       }
     }
 
-    const found: Comic[] = [];
-
-    for (const file of files) {
-      try {
-        found.push(await scanFile(file));
-      } catch (error) {
-        errors.push({ path: file, message: error instanceof Error ? error.message : String(error) });
-      }
-    }
-
     let foldersAdded = 0;
     for (const folder of folders) {
       const id = hash64(folder);
@@ -325,20 +341,62 @@ function registerIpc(): void {
       foldersAdded += 1;
     }
 
+    let added = 0;
+    let updated = 0;
+    const errors: { path: string; message: string }[] = [];
+
     if (folders.length > 0) {
       const result = await scanFolders(folders, {
         recursive: true,
         isCancelled: () => scanCancelled,
         onProgress: (progress) => mainWindow?.webContents.send('scan:progress', progress),
       });
-      found.push(...result.comics);
+      const counts = library.upsertComics(result.comics);
+      added = counts.added;
+      updated = counts.updated;
       errors.push(...result.errors);
+      await library.flush();
+    }
+
+    const roots = library.folders.filter((folder) => folder.enabled).map((folder) => folder.path);
+    const destinations = await listDestinations(roots);
+
+    return {
+      candidates: await planFiling(files, destinations),
+      destinations,
+      foldersAdded,
+      added,
+      updated,
+      skipped,
+      errors,
+    };
+  });
+
+  /**
+   * Second half: carry out a plan the user has confirmed, then index whatever
+   * ended up where.
+   */
+  ipcMain.handle('library:fileDrop', async (_event, instructions: FilingInstruction[]) => {
+    const outcomes = await fileComics(instructions);
+    const found: Comic[] = [];
+    const errors: { path: string; message: string }[] = [];
+
+    for (const outcome of outcomes) {
+      if (!outcome.path || outcome.status === 'skipped' || outcome.status === 'failed') continue;
+      try {
+        found.push(await scanFile(outcome.path));
+      } catch (error) {
+        errors.push({
+          path: outcome.path,
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
 
     const { added, updated } = library.upsertComics(found);
     await library.flush();
 
-    return { added, updated, foldersAdded, skipped, errors };
+    return { outcomes, added, updated, errors };
   });
 
   ipcMain.handle('library:cancelScan', () => {

@@ -54,12 +54,50 @@ export interface CoverHashResult {
   cancelled: boolean;
 }
 
-export interface AddPathsResult {
+export interface Destination {
+  path: string;
+  label: string;
+  root: string;
+}
+
+export interface FilingCandidate {
+  source: string;
+  filename: string;
+  series?: string;
+  issue?: string;
+  suggestedPath?: string;
+  conflict: boolean;
+}
+
+export interface DropPlan {
+  candidates: FilingCandidate[];
+  destinations: Destination[];
+  foldersAdded: number;
   added: number;
   updated: number;
-  foldersAdded: number;
   /** Dropped items that were neither a folder nor a comic we can open. */
   skipped: number;
+  errors: { path: string; message: string }[];
+}
+
+export interface FilingInstruction {
+  source: string;
+  /** Absent means leave the file where it is. */
+  targetDir?: string;
+  onConflict?: 'skip' | 'keepBoth' | 'replace';
+}
+
+export interface FilingOutcome {
+  source: string;
+  path?: string;
+  status: 'moved' | 'left' | 'skipped' | 'failed';
+  message?: string;
+}
+
+export interface FilingResult {
+  outcomes: FilingOutcome[];
+  added: number;
+  updated: number;
   errors: { path: string; message: string }[];
 }
 
@@ -72,7 +110,8 @@ export interface LongboxApi {
   removeFolder(id: string): Promise<LibraryFolder[]>;
 
   scan(): Promise<ScanSummary>;
-  addPaths(paths: string[]): Promise<AddPathsResult>;
+  planDrop(paths: string[]): Promise<DropPlan>;
+  fileDrop(instructions: FilingInstruction[]): Promise<FilingResult>;
   pathForFile(file: File): string;
   cancelScan(): Promise<void>;
   onScanProgress(handler: (progress: ScanProgress) => void): () => void;

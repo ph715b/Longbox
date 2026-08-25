@@ -20,7 +20,8 @@ const api = {
   removeFolder: (id: string) => ipcRenderer.invoke('library:removeFolder', id),
 
   scan: () => ipcRenderer.invoke('library:scan'),
-  addPaths: (paths: string[]) => ipcRenderer.invoke('library:addPaths', paths),
+  planDrop: (paths: string[]) => ipcRenderer.invoke('library:planDrop', paths),
+  fileDrop: (instructions: unknown) => ipcRenderer.invoke('library:fileDrop', instructions),
 
   /**
    * The real path behind a dropped File.

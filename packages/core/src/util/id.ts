@@ -85,6 +85,11 @@ export function normaliseSeriesName(name: string): string {
     // Drop diacritics so "Pokemon" and its accented spelling agree.
     .replace(/[̀-ͯ]/g, '')
     .replace(/&/g, ' and ')
+    // Apostrophes are dropped rather than folded to a space, so "World's
+    // Finest" and "Worlds Finest" agree. Spacing them apart instead would leave
+    // "world s finest", which matches neither spelling and quietly splits a
+    // series in two -- or, when filing, fails to find the folder already there.
+    .replace(/['’]/g, '')
     .replace(/[^a-z0-9]+/g, ' ')
     .replace(/^(the|a|an)\s+/, '')
     .trim()
