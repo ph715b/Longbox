@@ -113,10 +113,13 @@ export interface Series {
   publisher?: string;
   /** Year of the earliest issue. */
   startYear?: number;
+  /** Issues actually present on disk. */
   issueCount: number;
   /** How many issues are marked completed. */
   readCount: number;
-  /** Cover of the lowest-numbered issue. */
+  /** Issues indexed here whose files have since gone. */
+  missingCount: number;
+  /** Cover of the lowest-numbered issue that is still on disk. */
   coverComicId?: string;
   /** Per-series reader preferences, applied to every issue in it. */
   preferences?: SeriesPreferences;

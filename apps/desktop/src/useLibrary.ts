@@ -104,7 +104,10 @@ export function useLibrary() {
    * every comic when it derives the series list, so this is a plain filter.
    */
   const comicsOfSeries = useCallback(
-    (seriesId: string) => snapshot.comics.filter((comic) => comic.seriesId === seriesId),
+    (seriesId: string, includeMissing = false) =>
+      snapshot.comics.filter(
+        (comic) => comic.seriesId === seriesId && (includeMissing || !comic.missing),
+      ),
     [snapshot.comics],
   );
 

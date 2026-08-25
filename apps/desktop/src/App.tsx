@@ -32,6 +32,9 @@ type View = 'library' | 'series' | 'reading' | 'collections' | 'stats' | 'duplic
  */
 const STANDALONE_VIEWS = new Set<View>(['settings', 'collections', 'stats', 'duplicates']);
 
+/** Views made of comic tiles, where a vanished file would otherwise show as one. */
+const MISSING_AWARE_VIEWS = new Set<View>(['library', 'series', 'reading']);
+
 const SORT_OPTIONS: { value: SortField; label: string }[] = [
   { value: 'series', label: 'Series' },
   { value: 'added', label: 'Recently added' },
@@ -52,6 +55,7 @@ export function App() {
   const [sortDescending, setSortDescending] = useState(false);
   const [openSeriesId, setOpenSeriesId] = useState<string | undefined>();
   const [openCollectionId, setOpenCollectionId] = useState<string | undefined>();
+  const [showMissing, setShowMissing] = useState(false);
   const [reading, setReading] = useState<Comic | undefined>();
 
   // Bumped whenever the library changes underneath a view that fetched derived
@@ -74,9 +78,21 @@ export function App() {
   }, [library.settings.defaultReadingMode, library.settings.defaultFitMode]);
 
   const filter = useMemo<LibraryFilter>(
-    () => ({ search: search.trim() || undefined, readStatus }),
-    [search, readStatus],
+    () => ({ search: search.trim() || undefined, readStatus, includeMissing: showMissing }),
+    [search, readStatus, showMissing],
   );
+
+  /** Indexed comics whose files were gone at the last scan. */
+  const missingComics = useMemo(
+    () => library.comics.filter((comic) => comic.missing),
+    [library.comics],
+  );
+
+  const forgetMissing = useCallback(async () => {
+    await window.longbox.removeComics(missingComics.map((comic) => comic.id));
+    setShowMissing(false);
+    noteChanged();
+  }, [missingComics, noteChanged]);
 
   const sort = useMemo<LibrarySort>(
     () => ({ field: sortField, direction: sortDescending ? 'desc' : 'asc' }),
@@ -284,6 +300,15 @@ export function App() {
           </div>
         )}
 
+        {missingComics.length > 0 && MISSING_AWARE_VIEWS.has(view) && (
+          <MissingNotice
+            count={missingComics.length}
+            shown={showMissing}
+            onToggle={() => setShowMissing((value) => !value)}
+            onForget={() => void forgetMissing()}
+          />
+        )}
+
         <div className="content">
           {library.loading ? null : library.comics.length === 0 && !STANDALONE_VIEWS.has(view) ? (
             <EmptyLibrary
@@ -295,7 +320,7 @@ export function App() {
             />
           ) : openSeriesId ? (
             <SeriesDetail
-              comics={library.comicsOfSeries(openSeriesId)}
+              comics={library.comicsOfSeries(openSeriesId, showMissing)}
               onOpen={openComic}
             />
           ) : view === 'series' ? (
@@ -351,6 +376,44 @@ export function App() {
 }
 
 // --- Pieces ---------------------------------------------------------------
+
+/**
+ * Files that were indexed and have since gone.
+ *
+ * They are kept rather than deleted, because a disconnected drive or a folder
+ * moved in Explorer looks exactly like a deletion, and throwing away reading
+ * history on that guess is not recoverable. They are hidden rather than shown,
+ * because a tile with no cover and no explanation reads as a bug. This says
+ * plainly that they exist and offers the two things worth doing about them.
+ */
+function MissingNotice({
+  count,
+  shown,
+  onToggle,
+  onForget,
+}: {
+  count: number;
+  shown: boolean;
+  onToggle: () => void;
+  onForget: () => void;
+}) {
+  return (
+    <div className="missing-banner">
+      <span className="missing-glyph">⚠</span>
+      <span>
+        {count} {count === 1 ? 'comic is' : 'comics are'} no longer on disk. Reading progress is
+        kept in case {count === 1 ? 'the file comes' : 'the files come'} back.
+      </span>
+      <span style={{ flex: 1 }} />
+      <button className="btn" onClick={onToggle}>
+        {shown ? 'Hide' : 'Show'}
+      </button>
+      <button className="btn" onClick={onForget}>
+        Remove from library
+      </button>
+    </div>
+  );
+}
 
 function NavItem({
   icon,
@@ -527,7 +590,7 @@ function SeriesGrid({
             title={item.name}
             subtitle={`${item.issueCount} issue${item.issueCount === 1 ? '' : 's'}${
               item.readCount ? ` · ${item.readCount} read` : ''
-            }`}
+            }${item.missingCount ? ` · ${item.missingCount} off disk` : ''}`}
             onOpen={() => onOpen(item.id)}
           />
         );

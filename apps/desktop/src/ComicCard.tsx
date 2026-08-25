@@ -116,7 +116,7 @@ export function ComicCard({
     // A div rather than a button: the collections control is itself a button and
     // one cannot be nested inside another.
     <div
-      className="card"
+      className={`card ${comic.missing ? 'is-missing' : ''}`}
       role="button"
       tabIndex={0}
       onClick={() => onOpen(comic)}
@@ -129,7 +129,12 @@ export function ComicCard({
       title={comic.filename}
     >
       <div className="cover">
-        {failed ? (
+        {comic.missing ? (
+          <div className="cover-fallback missing-cover">
+            <span className="missing-glyph">⚠</span>
+            {comic.filename}
+          </div>
+        ) : failed ? (
           <div className="cover-fallback">{comic.filename}</div>
         ) : (
           <img
@@ -143,7 +148,9 @@ export function ComicCard({
           />
         )}
 
-        {completed ? (
+        {comic.missing ? (
+          <span className="badge missing">No file</span>
+        ) : completed ? (
           <span className="badge done">Read</span>
         ) : started ? null : (
           <span className="badge unread">New</span>

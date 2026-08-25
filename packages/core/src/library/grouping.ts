@@ -70,6 +70,13 @@ export function groupIntoSeries(comics: Comic[]): Series[] {
   for (const [id, members] of buckets) {
     members.sort(compareIssues);
 
+    // Counts and the cover describe what is actually here. An issue whose file
+    // has gone is still a member -- its reading history is worth keeping, and
+    // the file may come back with the drive -- but counting it would overstate
+    // the collection, and picking its cover would leave the series looking
+    // broken because there is nothing to load.
+    const present = members.filter((comic) => !comic.missing);
+
     // Prefer the most common spelling of the name rather than whichever issue
     // happened to sort first -- one mistyped filename shouldn't rename a series.
     const name =
@@ -86,10 +93,12 @@ export function groupIntoSeries(comics: Comic[]): Series[] {
       name,
       publisher: mostCommon(members.map((comic) => comic.metadata.publisher).filter(isString)),
       startYear: years.length > 0 ? Math.min(...years) : undefined,
-      issueCount: members.length,
-      readCount: members.filter((comic) => comic.state.completed).length,
-      // The lowest-numbered issue is the one whose cover represents the series.
-      coverComicId: members[0]?.id,
+      issueCount: present.length,
+      readCount: present.filter((comic) => comic.state.completed).length,
+      missingCount: members.length - present.length,
+      // The lowest-numbered issue is the one whose cover represents the series,
+      // falling back to a missing one only when every issue is gone.
+      coverComicId: (present[0] ?? members[0])?.id,
       tags: [...new Set(members.flatMap((comic) => comic.tags))],
       favorite: members.some((comic) => comic.favorite),
     });
